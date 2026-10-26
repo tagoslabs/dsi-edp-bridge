@@ -1,0 +1,186 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * NanoPi M6 (RK3588S, FriendlyELEC kernel 6.1.141 nanopi6-v6.1.y)
+ * DSI0 (dsi@fde20000, rockchip,rk3588-mipi-dsi2 + mipi_dcphy0)
+ *   -> SN65DSI86 @ I2C4_M3 0x2C -> BOE NE160WUM-N62 eDP (2 lanes HBR, ASSR, no HPD)
+ * Applied overlay for payload/new-rev0a-nologo.dtb.
+ * Same text as payload/rk3588-nanopi6-m6-sn65dsi86.dtsi except route_dsi0
+ * stays disabled. Include at END of rk3588-nanopi6-rev0a.dts.
+ * Pins verified on live DT: i2c4m3_xfer = GPIO1_A3/A2 func9; pwm10m2_pins = GPIO3_D3 func11
+ * (so BL_PWM IS PWM-capable: PWM10 = pwm@febe0020, label dsi0_pwm).
+ */
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/pinctrl/rockchip.h>
+
+/ {
+	tagos_edp_refclk: tagos-edp-refclk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <27000000>;	/* driver supports 12/19.2/26/27/38.4 MHz */
+	};
+
+	/* Bridge 1.8 V/1.2 V rails are always-on on our board: dummy fixed regulators. */
+	tagos_bridge_1v8: tagos-bridge-1v8 {
+		compatible = "regulator-fixed";
+		regulator-name = "tagos_bridge_1v8";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+	tagos_bridge_1v2: tagos-bridge-1v2 {
+		compatible = "regulator-fixed";
+		regulator-name = "tagos_bridge_1v2";
+		regulator-min-microvolt = <1200000>;
+		regulator-max-microvolt = <1200000>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	/* Panel 3.3 V (TPS22919). VLED 12 V follows in hardware. */
+	tagos_lcd_vcc: tagos-lcd-vcc {
+		compatible = "regulator-fixed";
+		regulator-name = "tagos_lcd_vcc";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio3 RK_PC0 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		startup-delay-us = <10000>;
+		off-on-delay-us = <500000>;	/* N62 T12: power-off >= 500 ms before re-on */
+		pinctrl-names = "default";
+		pinctrl-0 = <&tagos_lcd_vcc_en>;
+	};
+
+	tagos_backlight: tagos-backlight {
+		compatible = "pwm-backlight";
+		pwms = <&pwm10 0 1000000 0>;	/* 1 kHz; N62 allows 200..2000 Hz */
+		enable-gpios = <&gpio3 RK_PC1 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&tagos_bl_en>;
+		brightness-levels = <0 255>;
+		num-interpolated-steps = <255>;
+		default-brightness-level = <160>;
+		post-pwm-on-delay-ms = <10>;
+		pwm-off-delay-ms = <10>;
+	};
+};
+
+&pinctrl {
+	tagos-edp {
+		tagos_lcd_vcc_en: tagos-lcd-vcc-en {
+			rockchip,pins = <3 RK_PC0 RK_FUNC_GPIO &pcfg_pull_down>;
+		};
+		tagos_bl_en: tagos-bl-en {
+			rockchip,pins = <3 RK_PC1 RK_FUNC_GPIO &pcfg_pull_down>;
+		};
+		tagos_bridge_en: tagos-bridge-en {
+			rockchip,pins = <3 RK_PD2 RK_FUNC_GPIO &pcfg_pull_down>;
+		};
+	};
+};
+
+&pwm10 {	/* = dsi0_pwm, pwm@febe0020 */
+	pinctrl-names = "active";
+	pinctrl-0 = <&pwm10m2_pins>;
+	status = "okay";
+};
+
+&i2c4 {	/* = dsi0_i2c, i2c@feac0000 */
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c4m3_xfer>;
+	clock-frequency = <100000>;
+	status = "okay";
+
+	tagos_bridge: bridge@2c {
+		compatible = "ti,sn65dsi86";
+		reg = <0x2c>;
+		enable-gpios = <&gpio3 RK_PD2 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&tagos_bridge_en>;
+		vcc-supply = <&tagos_bridge_1v2>;
+		vcca-supply = <&tagos_bridge_1v2>;
+		vpll-supply = <&tagos_bridge_1v8>;
+		vccio-supply = <&tagos_bridge_1v8>;
+		clocks = <&tagos_edp_refclk>;
+		clock-names = "refclk";
+		/* no-hpd is a PANEL property; the driver itself always sets HPD_DISABLE. */
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				tagos_bridge_in: endpoint {
+					remote-endpoint = <&tagos_dsi0_out>;
+					/* driver hard-codes 4 DSI lanes; data-lanes here is ignored */
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+				tagos_bridge_out: endpoint {
+					data-lanes = <0 1>;	/* 2 eDP lanes, straight mapping */
+					remote-endpoint = <&tagos_panel_in>;
+				};
+			};
+		};
+
+		aux-bus {
+			panel: panel {
+				/* generic: reads EDID over AUX; unknown BOE id -> conservative delays (OK) */
+				compatible = "edp-panel";
+				power-supply = <&tagos_lcd_vcc>;
+				backlight = <&tagos_backlight>;
+				no-hpd;
+				hpd-absent-delay-ms = <200>;	/* N62 T3 max 200 ms */
+
+				port {
+					tagos_panel_in: endpoint {
+						remote-endpoint = <&tagos_bridge_out>;
+					};
+				};
+			};
+		};
+	};
+};
+
+/* NOTE: in this FriendlyELEC tree the labels mipi_dcphy0/1 point to "/mipi-dcphy-dummy";
+ * real PHYs are &mipidcphy0 (phy@feda0000, used by dsi0) / &mipidcphy1 - both already "okay". */
+&mipidcphy0 {
+	status = "okay";
+};
+
+&dsi0 {
+	status = "okay";
+	/* rockchip vendor dsi2: keep defaults; remove any panel@0 child if a dts adds one */
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@1 {
+			reg = <1>;
+			tagos_dsi0_out: endpoint {
+				remote-endpoint = <&tagos_bridge_in>;
+			};
+		};
+	};
+};
+
+/* VP2 currently feeds DSI1 (YX35 panel). Move VP2 to DSI0, turn DSI1 off. */
+&dsi0_in_vp2 { status = "okay"; };
+&dsi0_in_vp3 { status = "disabled"; };
+&dsi1_in_vp2 { status = "disabled"; };
+
+&route_dsi0 {
+	/* Shipped DTB: U-Boot must not drive DSI0 (the "nologo" image).
+	 * payload/rk3588-nanopi6-m6-sn65dsi86.dtsi sets status = "okay";
+	 * that draft is not what was written into the resource image. */
+	status = "disabled";
+	connect = <&vp2_out_dsi0>;
+};
+&route_dsi1 { status = "disabled"; };
+
+&dsi1 { status = "disabled"; };
+/* mipidcphy1 left as-is (okay) - may be shared with CSI. */
