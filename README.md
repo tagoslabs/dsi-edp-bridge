@@ -3,6 +3,11 @@
 Enables the TagosLabs SN65DSI86 bridge board on a **FriendlyElec NanoPi M6** so that the
 **BOE NE160WUM-N62** 16" eDP panel (1920×1200) shows your GNOME desktop.
 
+## ⚠️ Before you power on: check polarity
+- **Power input connector (J3):** off-the-shelf pigtails for this connector come with the wire colors reversed relative to this board (red lands on −). Go by the **+ / − marking on the board**, not the wire colors. Rev 2 will match standard cables.
+- Measure with a multimeter before connecting: + to + and − to − on J3. Reversed polarity can destroy the board and the panel.
+- Check the panel FPC orientation (see *Cable orientation* below) before the first power-up.
+
 ## Quick start
 1. Download **tagos-bridge-installer.run** in your web browser (it goes to your Downloads folder).
 2. Press **Ctrl+Alt+T** to open a Terminal.
@@ -67,6 +72,7 @@ Correctly inserted, LED1 lights up once the panel power is enabled. The DSI cabl
 **DSI0** connector of the NanoPi M6. The DSI1 (YX35) LCD output is disabled by this DT.
 
 ## Troubleshooting
+- **Nothing powers up / board got hot** — check J3 polarity first (see the warning at the top).
 - **Panel stays black**
   - `uname -r` must be `6.1.141`; `lsmod | grep -E 'sn65|panel_edp|aux'` must show all 4 modules.
   - `dmesg | grep -iE 'sn65|edp|dsi|aux'` — "disagrees about version of symbol" = wrong kernel.
