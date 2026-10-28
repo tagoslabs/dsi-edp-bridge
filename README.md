@@ -1,5 +1,8 @@
 # TagosLabs SN65DSI86 DSI→eDP bridge — installer for NanoPi M6
 
+> **TagosBook** — a laptop I'm building from scratch. This bridge is its first board.
+> 💛 **Want a board or want to support the build?** → [tagoslabs.com/story](https://tagoslabs.com/story) · [Buy Me a Coffee](https://buymeacoffee.com/tagoslabs)
+
 Enables the TagosLabs SN65DSI86 bridge board on a **FriendlyElec NanoPi M6** so that the
 **BOE NE160WUM-N62** 16" eDP panel (1920×1200) shows your GNOME desktop.
 
