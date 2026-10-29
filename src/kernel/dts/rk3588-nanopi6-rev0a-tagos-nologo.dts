@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * NanoPi M6 rev0a device tree for the TagosLabs SN65DSI86 bridge.
+ * This is the source of payload/new-rev0a-nologo.dtb.
+ *
+ * rk3588-nanopi6-rev0a.dts comes from friendlyarm/kernel-rockchip
+ * (see ../SOURCES.md). The overlay next to this file is applied at the end.
+ */
+#include "rk3588-nanopi6-rev0a.dts"
+#include "rk3588-nanopi6-m6-sn65dsi86-nologo.dtsi"

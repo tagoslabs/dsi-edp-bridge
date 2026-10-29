@@ -87,3 +87,33 @@ Correctly inserted, LED1 lights up once the panel power is enabled. The DSI cabl
   Restore the backup as described in *Revert*.
 - **Installer refuses** — the message tells why (wrong board, kernel, missing `resource` partition,
   checksum). Nothing is changed in that case.
+
+## Licensing
+
+The kernel modules and the device tree in this repository are GPL-2.0 works. `LICENSE` is the file-by-file map. In short:
+
+- `payload/mods/*.ko` and `src/kernel/*.c` are GPL-2.0-only, the Linux kernel license. `panel-edp.c` also keeps the NVIDIA permission notice that is already in that kernel file.
+- The device-tree sources (`payload/rk3588-nanopi6-m6-sn65dsi86.dtsi` and `src/kernel/dts/`) are `(GPL-2.0+ OR MIT)`, which is the SPDX line they carry. The compiled `.dtb` files are built from the FriendlyElec kernel device tree plus that overlay.
+- This repository has no schematic or PCB files, so CERN-OHL-S-2.0 is not applied here.
+
+Board design: https://oshwlab.com/tagoslabs/project_jfepxtgx
+
+Where to buy a board: https://www.tindie.com/products/44413/
+
+Which source file belongs to which shipped binary is in [src/kernel/SOURCES.md](src/kernel/SOURCES.md).
+
+## Build from source
+
+The modules need the FriendlyElec headers for kernel 6.1.141, package 6.1.141-16 (`linux-headers-6.1.141`). On the NanoPi M6:
+
+```
+make -C src/kernel KERNEL_SRC=/lib/modules/$(uname -r)/build
+```
+
+The device tree needs a checkout of https://github.com/friendlyarm/kernel-rockchip (the commit is in `src/kernel/SOURCES.md`) and `dtc`:
+
+```
+KERNEL_SRC=/path/to/kernel-rockchip src/kernel/build-dtb.sh
+```
+
+A rebuild of the modules comes out with the same vermagic (`6.1.141 SMP mod_unload modversions aarch64`) and the same `srcversion` as the `.ko` files in `payload/mods/`. The bytes differ unless the compiler is Debian GCC 14.2.0-19, which is the compiler named inside those files. The rebuilt device tree matches `payload/new-rev0a-nologo.dtb` as a tree; one padding byte differs and no property does. Details and the gaps (including one device tree in the resource image with no public source) are in `src/kernel/SOURCES.md`.
